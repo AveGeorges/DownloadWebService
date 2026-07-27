@@ -1,0 +1,43 @@
+from collections.abc import Sequence
+from typing import Protocol
+from uuid import UUID
+
+from app.domain.entities import DigitStatsCache, DownloadedFile, DownloadJob
+from app.domain.enums import DownloadJobStatus
+
+
+class DownloadJobRepository(Protocol):
+    def add(self, job: DownloadJob) -> DownloadJob: ...
+
+    def get(self, job_id: UUID) -> DownloadJob | None: ...
+
+    def update(self, job: DownloadJob) -> DownloadJob: ...
+
+    def list_by_status(self, status: DownloadJobStatus) -> Sequence[DownloadJob]: ...
+
+
+class DownloadedFileRepository(Protocol):
+    def add(self, file: DownloadedFile) -> DownloadedFile: ...
+
+    def get(self, file_id: UUID) -> DownloadedFile | None: ...
+
+    def get_by_filename(self, filename: str) -> DownloadedFile | None: ...
+
+    def list_paginated(
+        self,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[Sequence[DownloadedFile], int]: ...
+
+    def list_ids(self) -> Sequence[UUID]: ...
+
+    def list_by_ids(self, file_ids: Sequence[UUID]) -> Sequence[DownloadedFile]: ...
+
+
+class DigitStatsCacheRepository(Protocol):
+    def upsert(self, cache: DigitStatsCache) -> DigitStatsCache: ...
+
+    def get(self, file_id: UUID) -> DigitStatsCache | None: ...
+
+    def list_by_file_ids(self, file_ids: Sequence[UUID]) -> Sequence[DigitStatsCache]: ...

@@ -1,8 +1,9 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from pydantic import BaseModel, Field
 
 from app import __version__
 from app.config import get_settings
+from app.infrastructure.db.session import check_database
 
 router = APIRouter(tags=["health"])
 
@@ -24,15 +25,22 @@ async def health() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__, app=settings.app_name)
 
 
-@router.get("/ready", response_model=ReadyResponse, status_code=status.HTTP_200_OK)
-async def ready() -> ReadyResponse:
-    """Readiness probe. Dependency checks will be added in later stages."""
-    return ReadyResponse(
-        status="ready",
-        checks={
-            "api": "ok",
-            "database": "skipped",
-            "redis": "skipped",
-            "rabbitmq": "skipped",
-        },
-    )
+@router.get("/ready", response_model=ReadyResponse)
+async def ready(response: Response) -> ReadyResponse:
+    checks = {
+        "api": "ok",
+        "database": "ok",
+        "redis": "skipped",
+        "rabbitmq": "skipped",
+    }
+
+    try:
+        check_database()
+    except Exception:
+        checks["database"] = "fail"
+
+    if checks["database"] != "ok":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return ReadyResponse(status="not_ready", checks=checks)
+
+    return ReadyResponse(status="ready", checks=checks)

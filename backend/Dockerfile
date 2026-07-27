@@ -16,14 +16,19 @@ RUN apt-get update \
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY tests ./tests
+COPY alembic.ini ./
+COPY alembic ./alembic
+COPY scripts/entrypoint.sh /entrypoint.sh
 
 RUN pip install --upgrade pip \
     && pip install -e ".[dev]" \
     && mkdir -p /data/files \
-    && chown -R app:app /app /data
+    && chmod +x /entrypoint.sh \
+    && chown -R app:app /app /data /entrypoint.sh
 
 USER app
 
 EXPOSE 8000
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
