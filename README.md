@@ -71,4 +71,15 @@ alembic upgrade head
 
 - **Этап 0:** каркас, Docker Compose, health/ping, React-заглушка
 - **Этап 1:** domain-модели, SQLAlchemy, Alembic, репозитории, FileStorage, `/ready` проверяет БД
-- **Этап 2 (текущий):** клиент внешнего API (`ExternalCatalogClient`), Retry-After / 429 / 403, chunking ≤3
+- **Этап 2:** клиент внешнего API (`ExternalCatalogClient`), Retry-After / 429 / 403, chunking ≤3
+- **Этап 3 (текущий):** Celery `run_download_job`, Redis progress/lock, ZIP → storage → DB → mark downloaded
+
+### Проверка этапа 3 (без UI)
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+pytest -q tests/test_download_job_use_cases.py tests/test_zip_extractor.py -v
+```
+
+HTTP-эндпоинт старта job появится на этапе 4; сейчас логика проверяется unit-тестами use case.
