@@ -10,69 +10,54 @@
 - Nginx, Docker Compose
 - Ruff, Pytest, Alembic
 
-## Структура
+## Быстрый старт
 
+```powershell
+Copy-Item .env.example .env
+# Укажите реальный EXTERNAL_API_BASE_URL и X_CANDIDATE_ID
+docker compose up --build -d
 ```
-backend/          # API + worker (clean architecture layers)
-frontend/         # React UI (Nginx в образе)
-docker-compose.yml
-```
 
-## Алгоритм проверки и запуска
+UI: http://localhost:8080  
+Swagger: http://localhost:8080/docs
 
-### 1. Backend без Docker
+## Проверки backend
 
 ```powershell
 .\scripts\check-backend.ps1
 ```
 
-Ожидание: `All checks passed!`, все тесты зелёные.
-
-### 2. Полный стек в Docker
+## Проверка frontend
 
 ```powershell
-docker info
-Copy-Item .env.example .env
-docker compose up --build -d
-docker compose ps
-
-curl.exe http://localhost:8080/health
-curl.exe http://localhost:8080/ready
+cd frontend
+npm install
+npm run build
 ```
 
-| URL | Ожидание |
-|-----|----------|
-| http://localhost:8080 | UI-заглушка |
-| http://localhost:8080/health | `status: ok` |
-| http://localhost:8080/ready | `database: ok` |
-| http://localhost:8080/docs | Swagger |
-| http://localhost:15672 | RabbitMQ (`dws` / `dws_secret`) |
+## UI (этап 5)
 
-### API этапа 4
+- Кнопка **«Скачать данные»** в шапке на любой странице
+- Прогресс: старт по НСК, «получено N названий, скачиваю/скачано M из N»
+- Список файлов: имя, время (НСК), пагинация
+- Выбор: точечно / страница / все; **«Произвести расчёты»**
+- Результаты: общая статистика 0–9 и таблица по файлам
 
-```powershell
-# Старт скачивания (нужен валидный EXTERNAL_API_BASE_URL)
-curl.exe -X POST http://localhost:8080/api/v1/download-jobs
+## API
 
-# Статус job
-curl.exe http://localhost:8080/api/v1/download-jobs/<job_id>
-
-# Список файлов
-curl.exe "http://localhost:8080/api/v1/files?limit=20&offset=0"
-
-# Все id
-curl.exe -X POST http://localhost:8080/api/v1/files/select-all-ids
-
-# Расчёты
-curl.exe -X POST http://localhost:8080/api/v1/calculations -H "Content-Type: application/json" -d "{\"file_ids\":[\"...\"]}"
-```
-
-Остановка: `docker compose down`
+| Method | Path | Назначение |
+|--------|------|------------|
+| POST | `/api/v1/download-jobs` | Старт скачивания |
+| GET | `/api/v1/download-jobs/{id}` | Статус/прогресс |
+| GET | `/api/v1/files` | Список файлов |
+| POST | `/api/v1/files/select-all-ids` | Все id |
+| POST | `/api/v1/calculations` | Статистика цифр |
 
 ## Этапы
 
-- **Этап 0:** каркас, Docker Compose, health/ping, React-заглушка
-- **Этап 1:** domain-модели, SQLAlchemy, Alembic, репозитории, FileStorage
-- **Этап 2:** клиент внешнего API, Retry-After / 429 / 403
-- **Этап 3:** Celery download job, Redis progress/lock
-- **Этап 4 (текущий):** FastAPI — download-jobs, files, calculations
+- **0:** каркас + Docker
+- **1:** модели + Alembic
+- **2:** внешний API-клиент
+- **3:** Celery download job
+- **4:** FastAPI endpoints
+- **5 (текущий):** React UI
