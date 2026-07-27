@@ -70,4 +70,5 @@ alembic upgrade head
 ## Этапы
 
 - **Этап 0:** каркас, Docker Compose, health/ping, React-заглушка
-- **Этап 1 (текущий):** domain-модели, SQLAlchemy, Alembic, репозитории, FileStorage, `/ready` проверяет БД
+- **Этап 1:** domain-модели, SQLAlchemy, Alembic, репозитории, FileStorage, `/ready` проверяет БД
+- **Этап 2 (текущий):** клиент внешнего API (`ExternalCatalogClient`), Retry-After / 429 / 403, chunking ≤3
