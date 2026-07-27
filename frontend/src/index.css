@@ -1,0 +1,70 @@
+:root {
+  color: #14213d;
+  background:
+    radial-gradient(circle at 10% 10%, #dce9f5 0%, transparent 45%),
+    radial-gradient(circle at 90% 0%, #f0e6d8 0%, transparent 40%),
+    #f7f4ef;
+  font-family: "Segoe UI", "IBM Plex Sans", sans-serif;
+  line-height: 1.5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.brand {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.download-btn {
+  border: 1px solid #1f3a5f;
+  background: #1f3a5f;
+  color: #fff;
+  padding: 0.55rem 1rem;
+  font: inherit;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.panel {
+  padding: 1.5rem 0;
+}
+
+.panel h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.75rem;
+}
+
+.panel p {
+  margin: 0 0 0.75rem;
+  max-width: 42rem;
+}
+
+.ok {
+  color: #0b6b3a;
+}
+
+.err {
+  color: #9b1c1c;
+}
