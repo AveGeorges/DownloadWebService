@@ -1,23 +1,22 @@
-.PHONY: help env up down logs lint test api-shell build
+.PHONY: help env up down logs lint test build
 
 help:
-	@echo "make env       - copy .env.example to .env"
-	@echo "make up        - build and start the full stack"
-	@echo "make down      - stop and remove containers"
-	@echo "make logs      - follow container logs"
-	@echo "make lint      - run ruff check + format check"
-	@echo "make test      - run backend pytest"
-	@echo "make build     - build images only"
-	@echo "make api-shell - shell into api container"
+	@echo "make env   - copy .env.example to .env"
+	@echo "make up    - build and start stack (scripts/up.ps1 on Windows)"
+	@echo "make down  - stop stack"
+	@echo "make logs  - follow logs"
+	@echo "make lint  - ruff"
+	@echo "make test  - pytest"
+	@echo "make build - docker compose build"
 
 env:
 	@if not exist .env copy .env.example .env
 
 up: env
-	docker compose up --build -d
+	powershell -ExecutionPolicy Bypass -File .\scripts\up.ps1
 
 down:
-	docker compose down
+	powershell -ExecutionPolicy Bypass -File .\scripts\down.ps1
 
 logs:
 	docker compose logs -f
@@ -30,6 +29,3 @@ lint:
 
 test:
 	cd backend && python -m pytest -q
-
-api-shell:
-	docker compose exec api sh

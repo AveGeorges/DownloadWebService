@@ -14,14 +14,25 @@ def test_health() -> None:
 
 def test_ready_ok(monkeypatch) -> None:
     monkeypatch.setattr(
-        "app.presentation.api.v1.health.check_database",
+        "app.presentation.api.v1.health.check_database_connection",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "app.presentation.api.v1.health.check_redis",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "app.presentation.api.v1.health.check_rabbitmq",
         lambda: None,
     )
     client = TestClient(create_app())
     response = client.get("/ready")
     assert response.status_code == 200
-    assert response.json()["status"] == "ready"
-    assert response.json()["checks"]["database"] == "ok"
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["checks"]["database"] == "ok"
+    assert body["checks"]["redis"] == "ok"
+    assert body["checks"]["rabbitmq"] == "ok"
 
 
 def test_ready_db_fail(monkeypatch) -> None:
@@ -29,8 +40,16 @@ def test_ready_db_fail(monkeypatch) -> None:
         raise RuntimeError("db down")
 
     monkeypatch.setattr(
-        "app.presentation.api.v1.health.check_database",
+        "app.presentation.api.v1.health.check_database_connection",
         _fail,
+    )
+    monkeypatch.setattr(
+        "app.presentation.api.v1.health.check_redis",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "app.presentation.api.v1.health.check_rabbitmq",
+        lambda: None,
     )
     client = TestClient(create_app())
     response = client.get("/ready")

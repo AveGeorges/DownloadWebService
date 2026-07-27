@@ -4,44 +4,62 @@
 
 ## Стек
 
-- Python 3.12, FastAPI, SQLAlchemy, Celery
-- PostgreSQL, Redis, RabbitMQ
-- React + Vite
-- Nginx, Docker Compose
-- Ruff, Pytest, Alembic
+Python 3.12 · FastAPI · SQLAlchemy · Celery · PostgreSQL · Redis · RabbitMQ · React · Nginx · Docker
 
-## Быстрый старт
+## One-command demo
 
 ```powershell
+# 1) Env
 Copy-Item .env.example .env
-# Укажите реальный EXTERNAL_API_BASE_URL и X_CANDIDATE_ID
-docker compose up --build -d
+# Отредактируйте EXTERNAL_API_BASE_URL и X_CANDIDATE_ID
+
+# 2) Подъём всего стека
+.\scripts\up.ps1
 ```
 
-UI: http://localhost:8080  
-Swagger: http://localhost:8080/docs
+Или вручную: `docker compose up --build -d`
 
-## Проверки backend
+| URL | Что |
+|-----|-----|
+| http://localhost:8080 | UI |
+| http://localhost:8080/docs | Swagger |
+| http://localhost:8080/ready | Postgres + Redis + RabbitMQ |
+| http://localhost:15672 | RabbitMQ UI (`dws` / `dws_secret`) |
+
+Остановка: `.\scripts\down.ps1`
+
+Postgres/Redis/AMQP **не проброшены** на хост (только внутренняя сеть Docker). Снаружи — UI `:8080` и RabbitMQ management `:15672`.
+
+## Проверки качества
 
 ```powershell
 .\scripts\check-backend.ps1
-```
 
-## Проверка frontend
-
-```powershell
 cd frontend
 npm install
 npm run build
 ```
 
-## UI (этап 5)
+## Архитектура (кратко)
 
-- Кнопка **«Скачать данные»** в шапке на любой странице
-- Прогресс: старт по НСК, «получено N названий, скачиваю/скачано M из N»
-- Список файлов: имя, время (НСК), пагинация
-- Выбор: точечно / страница / все; **«Произвести расчёты»**
-- Результаты: общая статистика 0–9 и таблица по файлам
+```
+Browser → Nginx (frontend) → FastAPI (api)
+                              ↘ Celery worker ← RabbitMQ
+                              ↘ PostgreSQL / Redis / files volume
+```
+
+Кнопка «Скачать данные» → `POST /api/v1/download-jobs` → Celery качает каталог пачками ≤3 с учётом 429/403 → файлы в volume + БД → UI показывает список и считает цифры.
+
+## Переменные (.env)
+
+| Переменная | Назначение |
+|------------|------------|
+| `EXTERNAL_API_BASE_URL` | Базовый URL внешнего API задания |
+| `X_CANDIDATE_ID` | Идентификатор кандидата |
+| `POSTGRES_*` / `DATABASE_URL` | БД |
+| `REDIS_URL` | Прогресс job + result backend |
+| `CELERY_BROKER_URL` | RabbitMQ |
+| `FILES_STORAGE_PATH` | Путь к файлам в контейнере (`/data/files`) |
 
 ## API
 
@@ -55,9 +73,4 @@ npm run build
 
 ## Этапы
 
-- **0:** каркас + Docker
-- **1:** модели + Alembic
-- **2:** внешний API-клиент
-- **3:** Celery download job
-- **4:** FastAPI endpoints
-- **5 (текущий):** React UI
+0 каркас → 1 модели → 2 API-клиент → 3 Celery job → 4 FastAPI → 5 React UI → **6 Docker/Nginx demo**
