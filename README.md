@@ -44,42 +44,35 @@ curl.exe http://localhost:8080/ready
 |-----|----------|
 | http://localhost:8080 | UI-заглушка |
 | http://localhost:8080/health | `status: ok` |
-| http://localhost:8080/ready | `database: ok` (миграции при старте api) |
+| http://localhost:8080/ready | `database: ok` |
 | http://localhost:8080/docs | Swagger |
 | http://localhost:15672 | RabbitMQ (`dws` / `dws_secret`) |
 
-Проверка таблиц:
+### API этапа 4
 
 ```powershell
-docker compose exec postgres psql -U dws -d dws -c "\dt"
-```
+# Старт скачивания (нужен валидный EXTERNAL_API_BASE_URL)
+curl.exe -X POST http://localhost:8080/api/v1/download-jobs
 
-Ожидание: `download_jobs`, `downloaded_files`, `digit_stats_cache`.
+# Статус job
+curl.exe http://localhost:8080/api/v1/download-jobs/<job_id>
+
+# Список файлов
+curl.exe "http://localhost:8080/api/v1/files?limit=20&offset=0"
+
+# Все id
+curl.exe -X POST http://localhost:8080/api/v1/files/select-all-ids
+
+# Расчёты
+curl.exe -X POST http://localhost:8080/api/v1/calculations -H "Content-Type: application/json" -d "{\"file_ids\":[\"...\"]}"
+```
 
 Остановка: `docker compose down`
-
-### Миграции вручную
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-$env:DATABASE_URL="postgresql+psycopg://dws:dws_secret@localhost:5432/dws"
-alembic upgrade head
-```
 
 ## Этапы
 
 - **Этап 0:** каркас, Docker Compose, health/ping, React-заглушка
-- **Этап 1:** domain-модели, SQLAlchemy, Alembic, репозитории, FileStorage, `/ready` проверяет БД
-- **Этап 2:** клиент внешнего API (`ExternalCatalogClient`), Retry-After / 429 / 403, chunking ≤3
-- **Этап 3 (текущий):** Celery `run_download_job`, Redis progress/lock, ZIP → storage → DB → mark downloaded
-
-### Проверка этапа 3 (без UI)
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-pytest -q tests/test_download_job_use_cases.py tests/test_zip_extractor.py -v
-```
-
-HTTP-эндпоинт старта job появится на этапе 4; сейчас логика проверяется unit-тестами use case.
+- **Этап 1:** domain-модели, SQLAlchemy, Alembic, репозитории, FileStorage
+- **Этап 2:** клиент внешнего API, Retry-After / 429 / 403
+- **Этап 3:** Celery download job, Redis progress/lock
+- **Этап 4 (текущий):** FastAPI — download-jobs, files, calculations
