@@ -9,15 +9,10 @@ Python 3.12 · FastAPI · SQLAlchemy · Celery · PostgreSQL · Redis · RabbitM
 ## One-command demo
 
 ```powershell
-# 1) Env
 Copy-Item .env.example .env
 # Отредактируйте EXTERNAL_API_BASE_URL и X_CANDIDATE_ID
-
-# 2) Подъём всего стека
 .\scripts\up.ps1
 ```
-
-Или вручную: `docker compose up --build -d`
 
 | URL | Что |
 |-----|-----|
@@ -28,17 +23,19 @@ Copy-Item .env.example .env
 
 Остановка: `.\scripts\down.ps1`
 
-Postgres/Redis/AMQP **не проброшены** на хост (только внутренняя сеть Docker). Снаружи — UI `:8080` и RabbitMQ management `:15672`.
+## Проверки качества / CI
 
-## Проверки качества
+Локально:
 
 ```powershell
-.\scripts\check-backend.ps1
+.\scripts\check-backend.ps1   # ruff + pytest + coverage (>=70%)
 
 cd frontend
-npm install
+npm ci
 npm run build
 ```
+
+CI: `.github/workflows/ci.yml` — backend (ruff/pytest/coverage) и frontend (build) на push/PR.
 
 ## Архитектура (кратко)
 
@@ -47,19 +44,6 @@ Browser → Nginx (frontend) → FastAPI (api)
                               ↘ Celery worker ← RabbitMQ
                               ↘ PostgreSQL / Redis / files volume
 ```
-
-Кнопка «Скачать данные» → `POST /api/v1/download-jobs` → Celery качает каталог пачками ≤3 с учётом 429/403 → файлы в volume + БД → UI показывает список и считает цифры.
-
-## Переменные (.env)
-
-| Переменная | Назначение |
-|------------|------------|
-| `EXTERNAL_API_BASE_URL` | Базовый URL внешнего API задания |
-| `X_CANDIDATE_ID` | Идентификатор кандидата |
-| `POSTGRES_*` / `DATABASE_URL` | БД |
-| `REDIS_URL` | Прогресс job + result backend |
-| `CELERY_BROKER_URL` | RabbitMQ |
-| `FILES_STORAGE_PATH` | Путь к файлам в контейнере (`/data/files`) |
 
 ## API
 
@@ -73,4 +57,4 @@ Browser → Nginx (frontend) → FastAPI (api)
 
 ## Этапы
 
-0 каркас → 1 модели → 2 API-клиент → 3 Celery job → 4 FastAPI → 5 React UI → **6 Docker/Nginx demo**
+0 каркас → 1 модели → 2 API-клиент → 3 Celery job → 4 FastAPI → 5 React UI → 6 Docker/Nginx → **7 тесты + CI**

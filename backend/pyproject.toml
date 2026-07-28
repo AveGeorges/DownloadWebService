@@ -23,6 +23,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.8.0",
     "httpx>=0.28.0",
+    "fakeredis>=2.26.0",
 ]
 
 [build-system]
@@ -70,7 +71,25 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = [
+    "--strict-markers",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-fail-under=70",
+]
 
 [tool.coverage.run]
 source = ["app"]
 branch = true
+omit = [
+    "*/app/workers/celery_app.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

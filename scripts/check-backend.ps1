@@ -13,7 +13,7 @@ Write-Host "==> ruff check"
 ruff check src tests
 Write-Host "==> ruff format --check"
 ruff format --check src tests
-Write-Host "==> pytest"
+Write-Host "==> pytest + coverage"
 pytest -q
 
 Write-Host "OK: backend checks passed"
