@@ -110,7 +110,10 @@ class ExternalCatalogClient:
 
         if response.status_code == 429:
             delay = parse_retry_after(response.headers.get("Retry-After"), fallback_seconds=1.0)
-            logger.warning("Catalog rate limited (429), retry after %.1fs", delay)
+            logger.warning(
+                "Catalog rate limited (429)",
+                extra={"retry_after_seconds": delay, "status_code": 429},
+            )
             raise CatalogRateLimitedError(
                 "Catalog API rate limited",
                 retry_after_seconds=delay,
@@ -118,7 +121,10 @@ class ExternalCatalogClient:
 
         if response.status_code == 403:
             delay = parse_blocked_retry_after(response, default_seconds=1800.0)
-            logger.error("Catalog blocked (403), unblock in %.1fs", delay)
+            logger.error(
+                "Catalog blocked (403)",
+                extra={"retry_after_seconds": delay, "status_code": 403},
+            )
             raise CatalogBlockedError(
                 "Catalog API blocked the client",
                 retry_after_seconds=delay,

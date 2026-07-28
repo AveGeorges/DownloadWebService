@@ -15,6 +15,7 @@ from app.domain.enums import DownloadJobStatus
 from app.domain.exceptions import CatalogBlockedError, DownloadJobNotFoundError
 from app.domain.filename import sanitize_filename
 from app.domain.repositories import DownloadedFileRepository, DownloadJobRepository
+from app.infrastructure.logging import bind_log_context
 from app.infrastructure.storage.file_storage import FileStorage
 from app.infrastructure.zip.extractor import extract_zip_files
 
@@ -46,39 +47,56 @@ class RunDownloadJobUseCase:
         if job is None:
             raise DownloadJobNotFoundError(str(job_id))
 
-        job.status = DownloadJobStatus.RUNNING
-        job.error = None
-        self._persist(job)
-
-        try:
-            while True:
-                names = self._catalog.list_names()
-                if not names:
-                    break
-
-                job.names_received += len(names)
-                self._persist(job)
-
-                for batch in chunked(names):
-                    self._process_batch(job, batch)
-
-            job.status = DownloadJobStatus.COMPLETED
-            job.finished_at = datetime.now(UTC)
+        with bind_log_context(job_id=str(job.id)):
+            job.status = DownloadJobStatus.RUNNING
             job.error = None
             self._persist(job)
-            logger.info("Download job %s completed (%s files)", job.id, job.downloaded_count)
-            return job
-        except CatalogBlockedError as exc:
-            job.status = DownloadJobStatus.WAITING
-            job.error = f"Blocked by catalog API for {exc.retry_after_seconds:.0f}s"
-            self._persist(job)
-            raise
-        except Exception as exc:
-            job.status = DownloadJobStatus.FAILED
-            job.finished_at = datetime.now(UTC)
-            job.error = str(exc)
-            self._persist(job)
-            raise
+            logger.info("Download job started")
+
+            try:
+                while True:
+                    names = self._catalog.list_names()
+                    if not names:
+                        break
+
+                    job.names_received += len(names)
+                    self._persist(job)
+
+                    for batch in chunked(names):
+                        self._process_batch(job, batch)
+
+                job.status = DownloadJobStatus.COMPLETED
+                job.finished_at = datetime.now(UTC)
+                job.error = None
+                self._persist(job)
+                logger.info(
+                    "Download job completed",
+                    extra={
+                        "job_id": str(job.id),
+                        "downloaded_count": job.downloaded_count,
+                        "names_received": job.names_received,
+                    },
+                )
+                return job
+            except CatalogBlockedError as exc:
+                job.status = DownloadJobStatus.WAITING
+                job.error = f"Blocked by catalog API for {exc.retry_after_seconds:.0f}s"
+                self._persist(job)
+                logger.warning(
+                    "Download job waiting on catalog block",
+                    extra={
+                        "job_id": str(job.id),
+                        "retry_after_seconds": exc.retry_after_seconds,
+                    },
+                )
+                raise
+            except Exception as exc:
+                job.status = DownloadJobStatus.FAILED
+                job.finished_at = datetime.now(UTC)
+                job.error = str(exc)
+                self._persist(job)
+                logger.exception("Download job failed", extra={"job_id": str(job.id)})
+                raise
 
     def _process_batch(self, job: DownloadJob, batch: list[str]) -> None:
         # Keep API names for mark_downloaded; use sanitized names for local storage.
@@ -110,7 +128,15 @@ class RunDownloadJobUseCase:
                     )
                 )
                 job.downloaded_count += 1
-                logger.debug("Saved %s (%s bytes) to %s", filename, len(content), path)
+                logger.debug(
+                    "Saved downloaded file",
+                    extra={
+                        "job_id": str(job.id),
+                        "downloaded_filename": filename,
+                        "size_bytes": len(content),
+                        "content_path": str(path),
+                    },
+                )
             self._persist(job)
 
         # Acknowledge only after successful local persistence/commit of new files.

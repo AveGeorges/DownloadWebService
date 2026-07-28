@@ -11,6 +11,7 @@ from app.domain.entities import DownloadJob
 from app.domain.enums import DownloadJobStatus
 from app.domain.exceptions import ActiveDownloadExistsError
 from app.domain.repositories import DownloadJobRepository
+from app.infrastructure.logging import bind_log_context
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,11 @@ class StartDownloadJobUseCase:
                 )
             )
             self._enqueuer.enqueue_run_download_job(saved.id)
-            logger.info("Enqueued download job %s", saved.id)
+            with bind_log_context(job_id=str(saved.id)):
+                logger.info(
+                    "Enqueued download job",
+                    extra={"job_id": str(saved.id)},
+                )
             return saved
         except Exception:
             self._lock.release(job.id)

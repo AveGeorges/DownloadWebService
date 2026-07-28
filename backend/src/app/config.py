@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "DownloadWebService"
     app_env: str = "development"
     log_level: str = "INFO"
+    log_format: str = "json"  # json | text
 
     database_url: str = "postgresql+psycopg://dws:dws_secret@localhost:5432/dws"
     redis_url: str = "redis://localhost:6379/0"

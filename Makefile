@@ -1,13 +1,14 @@
-.PHONY: help env up down logs lint test build
+.PHONY: help env up down logs lint test build migrate
 
 help:
-	@echo "make env   - copy .env.example to .env"
-	@echo "make up    - build and start stack (scripts/up.ps1 on Windows)"
-	@echo "make down  - stop stack"
-	@echo "make logs  - follow logs"
-	@echo "make lint  - ruff"
-	@echo "make test  - pytest"
-	@echo "make build - docker compose build"
+	@echo "make env     - copy .env.example to .env"
+	@echo "make up      - build and start stack (scripts/up.ps1 on Windows)"
+	@echo "make down    - stop stack"
+	@echo "make logs    - follow logs"
+	@echo "make migrate - alembic upgrade head (local backend venv)"
+	@echo "make lint    - ruff"
+	@echo "make test    - pytest"
+	@echo "make build   - docker compose build"
 
 env:
 	@if not exist .env copy .env.example .env
@@ -20,6 +21,9 @@ down:
 
 logs:
 	docker compose logs -f
+
+migrate:
+	cd backend && python -m alembic upgrade head
 
 build:
 	docker compose build

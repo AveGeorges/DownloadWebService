@@ -23,6 +23,8 @@ Copy-Item .env.example .env
 
 Остановка: `.\scripts\down.ps1`
 
+Полезные `make`-цели: `up`, `down`, `logs`, `migrate`, `lint`, `test`, `build`.
+
 ## Проверки качества / CI
 
 Локально:
@@ -37,13 +39,58 @@ npm run build
 
 CI: `.github/workflows/ci.yml` — backend (ruff/pytest/coverage) и frontend (build) на push/PR.
 
-## Архитектура (кратко)
+## Архитектура
+
+Слои (Clean Architecture):
+
+| Слой | Ответственность |
+|------|-----------------|
+| `domain` | сущности, правила имён файлов, доменные ошибки |
+| `application` | use cases, DTO, порты |
+| `infrastructure` | Postgres, Redis, Celery, HTTP-клиент каталога, файлы |
+| `presentation` | FastAPI routers / middleware |
+| `workers` | Celery tasks |
 
 ```
 Browser → Nginx (frontend) → FastAPI (api)
                               ↘ Celery worker ← RabbitMQ
                               ↘ PostgreSQL / Redis / files volume
 ```
+
+### Поток скачивания
+
+```mermaid
+sequenceDiagram
+    participant UI as Browser
+    participant API as FastAPI
+    participant Q as RabbitMQ
+    participant W as Celery worker
+    participant Ext as External catalog
+    participant DB as Postgres
+    participant R as Redis
+
+    UI->>API: POST /api/v1/download-jobs
+    API->>R: acquire global lock
+    API->>DB: INSERT download_job
+    API->>Q: enqueue run_download_job
+    API-->>UI: 202 + job_id
+    W->>Ext: GET names (≤9)
+    loop batches of ≤3
+        W->>Ext: POST download → ZIP
+        W->>DB: INSERT downloaded_files
+        W->>Ext: POST downloaded (после commit)
+        W->>R: progress snapshot
+    end
+    UI->>API: GET /api/v1/download-jobs/{id}
+    API->>R: merge live progress
+    API-->>UI: status + counts
+```
+
+### Логи
+
+API и worker пишут **JSON-логи** в stdout (`LOG_FORMAT=json`). В записи попадают `timestamp`, `level`, `logger`, `message`, а также `request_id` (HTTP, заголовок `X-Request-ID`) и `job_id` (download job). Для локальной читаемости: `LOG_FORMAT=text`.
+
+Graceful shutdown: uvicorn `--timeout-graceful-shutdown 30`, Celery `worker_soft_shutdown_timeout=30`.
 
 ## API
 
@@ -57,4 +104,4 @@ Browser → Nginx (frontend) → FastAPI (api)
 
 ## Этапы
 
-0 каркас → 1 модели → 2 API-клиент → 3 Celery job → 4 FastAPI → 5 React UI → 6 Docker/Nginx → **7 тесты + CI**
+0 каркас → 1 модели → 2 API-клиент → 3 Celery job → 4 FastAPI → 5 React UI → 6 Docker/Nginx → 7 тесты + CI → **8 JSON-логи и полировка**
