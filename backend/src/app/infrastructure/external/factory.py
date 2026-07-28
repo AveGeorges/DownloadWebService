@@ -11,4 +11,5 @@ def build_external_catalog_client(
         candidate_id=cfg.x_candidate_id,
         timeout_seconds=cfg.external_api_timeout_seconds,
         max_attempts=cfg.external_api_max_attempts,
+        min_interval_seconds=cfg.external_api_min_interval_seconds,
     )

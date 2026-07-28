@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
@@ -32,12 +33,21 @@ class ExternalCatalogClient:
         candidate_id: str,
         timeout_seconds: float = 30.0,
         max_attempts: int = 5,
+        min_interval_seconds: float = 1.5,
         transport: httpx.BaseTransport | None = None,
         client: httpx.Client | None = None,
+        sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._candidate_id = candidate_id
         self._max_attempts = max_attempts
+        self._base_min_interval_seconds = max(0.0, min_interval_seconds)
+        self._min_interval_seconds = self._base_min_interval_seconds
+        self._sleep = sleep
+        self._clock = clock
+        self._last_request_at = 0.0
+        self._cooldown_until = 0.0
         self._owns_client = client is None
         self._client = client or httpx.Client(
             base_url=self._base_url,
@@ -62,7 +72,7 @@ class ExternalCatalogClient:
             self._raise_for_status(response)
             return self._parse_names_payload(response.json())
 
-        return with_retries(_call, max_attempts=self._max_attempts)
+        return with_retries(_call, max_attempts=self._max_attempts, sleep=self._sleep)
 
     def download(self, names: Sequence[str]) -> bytes:
         batch = list(names)
@@ -77,13 +87,13 @@ class ExternalCatalogClient:
             response = self._request(
                 "POST",
                 "/api/files/download",
-                json={"names": batch},
+                json={"file_names": batch},
                 headers={"Accept": "application/zip, application/octet-stream"},
             )
             self._raise_for_status(response)
             return response.content
 
-        return with_retries(_call, max_attempts=self._max_attempts)
+        return with_retries(_call, max_attempts=self._max_attempts, sleep=self._sleep)
 
     def mark_downloaded(self, names: Sequence[str]) -> None:
         batch = list(names)
@@ -91,12 +101,27 @@ class ExternalCatalogClient:
             raise CatalogRequestError("mark_downloaded requires at least one filename")
 
         def _call() -> None:
-            response = self._request("POST", "/api/files/downloaded", json={"names": batch})
+            response = self._request(
+                "POST",
+                "/api/files/downloaded",
+                json={"file_names": batch},
+            )
             self._raise_for_status(response)
 
-        with_retries(_call, max_attempts=self._max_attempts)
+        with_retries(_call, max_attempts=self._max_attempts, sleep=self._sleep)
+
+    def _pace(self) -> None:
+        """Space out calls so the external API is less likely to return 429/403."""
+        now = self._clock()
+        earliest = max(self._cooldown_until, self._last_request_at + self._min_interval_seconds)
+        delay = earliest - now
+        if delay > 0:
+            self._sleep(delay)
+            now = self._clock()
+        self._last_request_at = now
 
     def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        self._pace()
         try:
             return self._client.request(method, url, **kwargs)
         except httpx.TimeoutException as exc:
@@ -110,6 +135,13 @@ class ExternalCatalogClient:
 
         if response.status_code == 429:
             delay = parse_retry_after(response.headers.get("Retry-After"), fallback_seconds=1.0)
+            # Keep pacing quiet after a rate-limit window ends.
+            self._cooldown_until = max(self._cooldown_until, self._clock() + delay)
+            # Temporarily slow down further successful traffic.
+            self._min_interval_seconds = max(
+                self._base_min_interval_seconds,
+                min(max(delay, self._min_interval_seconds), 5.0),
+            )
             logger.warning(
                 "Catalog rate limited (429)",
                 extra={"retry_after_seconds": delay, "status_code": 429},
@@ -144,12 +176,13 @@ class ExternalCatalogClient:
 
     @staticmethod
     def _parse_names_payload(payload: Any) -> list[str]:
+        """Parse FileNamesResponse; keep a few legacy shapes for tests/mocks."""
         if payload is None:
             return []
         if isinstance(payload, list):
             return [str(item) for item in payload]
         if isinstance(payload, dict):
-            for key in ("names", "files", "data"):
+            for key in ("file_names", "names", "files", "data"):
                 value = payload.get(key)
                 if value is None:
                     continue

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     x_candidate_id: str = "local-dev-candidate"
     external_api_timeout_seconds: float = 30.0
     external_api_max_attempts: int = 5
+    # Minimum gap between catalog HTTP calls (avoids 429/403 abuse blocks).
+    external_api_min_interval_seconds: float = 1.5
     files_storage_path: str = "./data/files"
 
 
