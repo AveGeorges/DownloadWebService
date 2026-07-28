@@ -35,7 +35,9 @@ class FileIdsResponse(BaseModel):
 
 
 class CalculationRequest(BaseModel):
-    file_ids: list[UUID] = Field(min_length=1, max_length=500)
+    # Hard ceiling against abuse; normal "select all" catalogs fit under this.
+    # Processing is batched server-side (see CalculateDigitStatsUseCase).
+    file_ids: list[UUID] = Field(min_length=1, max_length=10_000)
 
 
 class FileDigitStatsResponse(BaseModel):
