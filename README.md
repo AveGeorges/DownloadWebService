@@ -102,6 +102,3 @@ Graceful shutdown: uvicorn `--timeout-graceful-shutdown 30`, Celery `worker_soft
 | POST | `/api/v1/files/select-all-ids` | Все id |
 | POST | `/api/v1/calculations` | Статистика цифр |
 
-## Этапы
-
-0 каркас → 1 модели → 2 API-клиент → 3 Celery job → 4 FastAPI → 5 React UI → 6 Docker/Nginx → 7 тесты + CI → **8 JSON-логи и полировка**
